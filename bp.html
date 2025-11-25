@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>B.P Serviços - Fazenda</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+    <style>
+        body { background-color: #f0f2f5; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .navbar-brand img, .footer-logo { 
+            height: 40px; 
+            width: auto; 
+        }
+        .content-container { background-color: white; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); border-radius: 8px; padding: 2rem; margin-bottom: 2rem; }
+        .welcome-section { text-align: center; padding: 1.5rem; background: linear-gradient(135deg, #1e3c72, #2a5298); color: white; border-radius: 8px; margin-bottom: 2rem; }
+        .welcome-section h1 { font-weight: 700; margin-bottom: 0; }
+        .welcome-section p { opacity: 0.8; margin-top: 5px; }
+        
+        .kpi-card .card-body { padding: 1rem 1.25rem; }
+        .kpi-card .kpi-value { font-size: 1.8rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .kpi-card .text-xs { font-size: 0.75rem; letter-spacing: 0.5px; text-transform: uppercase; }
+        
+        .text-entrada { color: #198754; font-weight: 600; }
+        .text-saida { color: #dc3545; font-weight: 600; }
+
+        .currency { text-align: right; }
+        .filter-container .form-select-sm { max-width: 200px; }
+        
+        .chart-container { height: 250px; position: relative; }
+
+        .sortable { cursor: pointer; user-select: none; }
+        .sortable:hover { color: #0d6efd; }
+        
+        .table-hover tbody tr:hover { background-color: rgba(0, 0, 0, 0.02); }
+
+        /* Estilos de Impressão (Mantendo a identidade do medicao.html) */
+        .report-print-header, .report-print-footer { display: none; }
+        
+        @media print {
+            body { background-color: #ffffff; }
+            .d-print-none { display: none !important; }
+            body > *:not(#reportModal) { display: none !important; }
+
+            #reportModal { display: block !important; position: static !important; inset: auto !important; margin: 0 !important; padding: 0 !important; }
+            #reportModal .modal-dialog { width: 100%; max-width: 100%; margin: 0; }
+            #reportModal .modal-content { border: none; box-shadow: none; }
+            #reportModal .modal-body { padding: 0; height: auto !important; max-height: none !important; overflow: visible !important; }
+
+            .report-print-header, .report-print-footer {
+                display: flex !important; width: 100%; align-items: center; justify-content: space-between;
+                position: fixed; left: 0; padding: 0.5cm 1.5cm; background-color: #ffffff; z-index: 1000;
+            }
+            .report-print-header { top: 0; border-bottom: 1px solid #dee2e6; }
+            .report-print-footer { bottom: 0; border-top: 1px solid #dee2e6; }
+            .report-print-header img, .report-print-footer img { max-height: 28px; width: auto; }
+            .report-print-footer .sign-text { text-align: right; font-size: 7.5pt; line-height: 1.3; }
+
+            #reportContentWrapper { margin: 3.8cm 1.5cm; font-size: 8.5pt; color: #212529; }
+            #reportContentWrapper h2 { font-size: 14pt; margin-bottom: 0.9rem !important; }
+            #reportContentWrapper table { width: 100%; border-collapse: collapse; font-size: 8pt; margin-bottom: 20px; }
+            #reportContentWrapper table th, #reportContentWrapper table td { padding: 4px 6px; border: 1px solid #dde1e5; text-align: right; }
+            #reportContentWrapper table th:first-child, #reportContentWrapper table td:first-child { text-align: left; }
+            
+            .page-break { page-break-before: always; }
+            @page { size: A4 portrait; margin: 0; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-dark bg-black d-print-none">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">
+                <img src="https://raw.githubusercontent.com/engineerRDG/vilhena.engenheiro.org/refs/heads/main/imagem/logo.png" alt="Vilhena Serviços Logo">
+            </a>
+            <span class="navbar-text text-white">CAIXA SINCREDI - FAZENDA - NUNES</span>
+        </div>
+    </nav>
+
+    <main class="container mt-4 d-print-none">
+        <div class="welcome-section">
+            <h1>Dashboard Financeiro</h1>
+            <p>Controle de Fluxo de Caixa e Resultados</p>
+        </div>
+
+        <div class="row mb-4">
+           <div class="col-md-6 col-lg-3 mb-3 mb-lg-0">
+               <div class="card shadow-sm kpi-card border-success h-100">
+                   <div class="card-body text-success">
+                       <div class="text-xs font-weight-bold mb-1"><i class="bi bi-arrow-up-circle-fill me-1"></i> Receita Total</div>
+                       <div id="kpi-income" class="kpi-value">R$ 0,00</div>
+                   </div>
+               </div>
+           </div>
+           <div class="col-md-6 col-lg-3 mb-3 mb-lg-0">
+               <div class="card shadow-sm kpi-card border-danger h-100">
+                   <div class="card-body text-danger">
+                       <div class="text-xs font-weight-bold mb-1"><i class="bi bi-arrow-down-circle-fill me-1"></i> Despesa Total</div>
+                       <div id="kpi-expense" class="kpi-value">R$ 0,00</div>
+                   </div>
+               </div>
+           </div>
+           <div class="col-md-6 col-lg-3 mb-3 mb-md-0">
+               <div class="card shadow-sm kpi-card border-primary h-100">
+                   <div class="card-body text-primary">
+                       <div class="text-xs font-weight-bold mb-1"><i class="bi bi-wallet2 me-1"></i> Saldo do Período</div>
+                       <div id="kpi-balance" class="kpi-value">R$ 0,00</div>
+                   </div>
+               </div>
+           </div>
+           <div class="col-md-6 col-lg-3">
+               <div class="card shadow-sm kpi-card border-secondary h-100">
+                   <div class="card-body text-secondary">
+                       <div class="text-xs font-weight-bold mb-1"><i class="bi bi-percent me-1"></i> Margem de Lucro</div>
+                       <div id="kpi-margin" class="kpi-value">0%</div>
+                   </div>
+               </div>
+           </div>
+        </div>
+
+        <div class="content-container">
+            <div class="row text-center mb-4">
+                <div class="col-lg-8 mb-4">
+                    <h5 class="mb-3">Evolução Financeira (Receita x Despesa)</h5>
+                    <div class="chart-container"><canvas id="evolutionChart"></canvas></div>
+                </div>
+                <div class="col-lg-4 mb-4">
+                    <h5 class="mb-3">Distribuição do Fluxo</h5>
+                    <div class="chart-container"><canvas id="distributionChart"></canvas></div>
+                </div>
+            </div>
+
+            <hr class="my-4">
+
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-3">
+                <div class="d-flex align-items-center gap-3">
+                    <h4 class="mb-0">Detalhamento de Movimentações</h4>
+                    <button id="report-button" class="btn btn-dark btn-sm" data-bs-toggle="modal" data-bs-target="#reportModal">
+                        <i class="bi bi-printer"></i> Relatório Financeiro
+                    </button>
+                </div>
+                <div class="d-flex align-items-center flex-wrap gap-3 filter-container">
+                    <div class="d-flex align-items-center">
+                        <label for="month-filter" class="form-label me-2 mb-0 text-nowrap">Filtrar Período:</label>
+                        <select id="month-filter" class="form-select form-select-sm"></select>
+                    </div>
+                </div>
+            </div>
+
+            <div id="data-display" class="table-responsive">
+                <div class="text-center p-5">
+                    <div class="spinner-border text-primary"></div>
+                    <p class="mt-2">Carregando dados financeiros...</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+<footer class="container mt-5 mb-4 d-flex flex-wrap justify-content-between align-items-center border-top pt-4" href="https://rodrigo.engenheiro.org" >
+    <img class="footer-logo">
+    <div class="text-end" href="https://rodrigo.engenheiro.org">
+    <p class="text-muted mb-1" style="font-size: 0.9rem;"><b>Vilhena Serviços LTDA</b><br>Departamento de Engenharia</p>
+    <p class="text-body-tertiary mb-0" style="font-size: 0.6rem;"><b>Rodrigo M. Araujo</b><br>Engenheiro Mecânico<br>
+    Engenheiro de Segurança do Trabalho
+    <br>
+<b>rodrigo@engenheiro.org</b>
+</p>
+    </div>
+    </footer>
+
+    <div class="modal fade" id="reportModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header d-print-none">
+                    <h5 class="modal-title">Relatório Financeiro</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="reportModalBody">
+                    <div class="report-print-header">
+                        <img src="https://raw.githubusercontent.com/engineerRDG/vilhena.engenheiro.org/refs/heads/main/imagem/logo.png" alt="Vilhena Serviços Logo">
+                    </div>
+                    <div id="reportContentWrapper"></div>
+                    <div class="report-print-footer">
+                        <img src="https://raw.githubusercontent.com/engineerRDG/vilhena.engenheiro.org/refs/heads/main/imagem/eletrobras.png" alt="Logo Eletrobras">
+                        <div class="sign-text">
+                            <p class="text-muted mb-1"><b>Vilhena Serviços LTDA</b><br>Departamento Financeiro</p>
+                            <p class="text-body-tertiary mb-0"><b>Diretoria Executiva</b></p>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer d-print-none">
+                    <button type="button" class="btn btn-primary" id="printReportButton">Imprimir</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+   <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const DATA_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTBFz_xpKrRv8Pqz9082TRo-p9CtIq_h78N2F5rI0Lv7_YBHRPIKNWXqQKH2fy5RQ/pub?output=csv';
+        
+        const dataDisplay = document.getElementById('data-display');
+        const monthFilter = document.getElementById('month-filter');
+        let allProcessedData = [];
+        let chartInstances = {};
+
+        const formatCurrency = (value) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        
+        const monthMap = { 'janeiro': 0, 'fevereiro': 1, 'março': 2, 'abril': 3, 'maio': 4, 'junho': 5, 'julho': 6, 'agosto': 7, 'setembro': 8, 'outubro': 9, 'novembro': 10, 'dezembro': 11 };
+        
+        const parseDate = dateStr => {
+            // Esperado: "agosto/2025"
+            if (typeof dateStr !== 'string' || !dateStr.includes('/')) return null;
+            const [monthName, year] = dateStr.trim().toLowerCase().split('/');
+            const monthIndex = monthMap[monthName];
+            if (monthIndex !== undefined && year?.length === 4) return new Date(year, monthIndex, 1);
+            return null;
+        };
+        
+        const parseValue = valStr => {
+            if (typeof valStr !== 'string') return 0;
+            // Remove "R$", pontos de milhar e troca vírgula por ponto
+            const cleanStr = valStr.replace('R$', '').trim().replace(/\./g, '').replace(',', '.');
+            return parseFloat(cleanStr) || 0;
+        };
+
+        function destroyChart(chartId) { if (chartInstances[chartId]) chartInstances[chartId].destroy(); }
+
+        function updateKPIs(data) {
+            let totalIncome = 0;
+            let totalExpense = 0;
+
+            data.forEach(item => {
+                if(item.type === 'Entrada') totalIncome += item.value;
+                if(item.type === 'Saída') totalExpense += item.value;
+            });
+
+            const balance = totalIncome - totalExpense;
+            const margin = totalIncome > 0 ? ((balance / totalIncome) * 100).toFixed(1) : 0;
+
+            document.getElementById('kpi-income').textContent = formatCurrency(totalIncome);
+            document.getElementById('kpi-expense').textContent = formatCurrency(totalExpense);
+            
+            const balEl = document.getElementById('kpi-balance');
+            balEl.textContent = formatCurrency(balance);
+            balEl.className = `kpi-value ${balance >= 0 ? 'text-success' : 'text-danger'}`;
+
+            const margEl = document.getElementById('kpi-margin');
+            margEl.textContent = `${margin}%`;
+            margEl.className = `kpi-value ${parseFloat(margin) >= 0 ? 'text-success' : 'text-danger'}`;
+        }
+        
+        function populateMonthFilter(data) {
+            const months = new Set(data.map(item => `${item.date.getFullYear()}-${(item.date.getMonth() + 1).toString().padStart(2, '0')}`));
+            const sortedMonths = Array.from(months).sort().reverse();
+            monthFilter.innerHTML = '<option value="all">Todo o Período</option>';
+            sortedMonths.forEach(monthKey => {
+               const [year, monthNum] = monthKey.split('-');
+               const monthName = new Date(year, monthNum - 1).toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
+               monthFilter.appendChild(new Option(monthName.charAt(0).toUpperCase() + monthName.slice(1), monthKey));
+            });
+        }
+
+       function renderTable(data) {
+            if (data.length === 0) { dataDisplay.innerHTML = `<div class="alert alert-warning mt-3">Nenhum registro encontrado.</div>`; return; }
+            
+            let tableHTML = `
+            <table class="table table-hover align-middle mb-0 bg-white">
+                <thead class="table-light">
+                    <tr>
+                        <th>Período</th>
+                        <th>Semana</th>
+                        <th>Descrição</th>
+                        <th class="text-center">Tipo</th>
+                        <th class="text-end">Valor</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+            
+            // Ordenar por data (mais recente primeiro)
+            const sortedData = [...data].sort((a, b) => b.date - a.date);
+
+            sortedData.forEach(item => {
+                const badgeClass = item.type === 'Entrada' ? 'bg-success-subtle text-success border border-success' : 'bg-danger-subtle text-danger border border-danger';
+                const valueClass = item.type === 'Entrada' ? 'text-entrada' : 'text-saida';
+                const dateStr = item.date.toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
+
+                tableHTML += `
+                <tr>
+                    <td class="text-capitalize">${dateStr}</td>
+                    <td>${item.week}</td>
+                    <td>${item.description}</td>
+                    <td class="text-center"><span class="badge ${badgeClass}">${item.type.toUpperCase()}</span></td>
+                    <td class="currency ${valueClass}">${formatCurrency(item.value)}</td>
+                </tr>`;
+            });
+            dataDisplay.innerHTML = tableHTML + `</tbody></table>`;
+       }
+
+       // --- Gráficos ---
+
+       function getMonthlyAggregates(data) {
+           const agg = {};
+           data.forEach(item => {
+               const key = `${item.date.getFullYear()}-${(item.date.getMonth() + 1).toString().padStart(2, '0')}`;
+               if (!agg[key]) agg[key] = { income: 0, expense: 0, date: item.date };
+               if (item.type === 'Entrada') agg[key].income += item.value;
+               if (item.type === 'Saída') agg[key].expense += item.value;
+           });
+           // Sort keys by date
+           return Object.entries(agg)
+               .sort((a, b) => a[1].date - b[1].date)
+               .map(([key, val]) => ({ 
+                   label: val.date.toLocaleString('pt-BR', { month: 'short', year: '2-digit' }), 
+                   income: val.income, 
+                   expense: val.expense,
+                   balance: val.income - val.expense
+               }));
+       }
+
+       function renderEvolutionChart(monthlyData) {
+           destroyChart('evolutionChart');
+           const ctx = document.getElementById('evolutionChart').getContext('2d');
+           chartInstances['evolutionChart'] = new Chart(ctx, {
+               type: 'bar',
+               data: {
+                   labels: monthlyData.map(d => d.label),
+                   datasets: [
+                       { label: 'Entradas', data: monthlyData.map(d => d.income), backgroundColor: 'rgba(25, 135, 84, 0.7)', borderRadius: 4 },
+                       { label: 'Saídas', data: monthlyData.map(d => d.expense), backgroundColor: 'rgba(220, 53, 69, 0.7)', borderRadius: 4 }
+                   ]
+               },
+               options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } }
+           });
+       }
+
+       function renderDistributionChart(data) {
+           destroyChart('distributionChart');
+           let totalIn = 0, totalOut = 0;
+           data.forEach(d => { if(d.type==='Entrada') totalIn+=d.value; else totalOut+=d.value; });
+           
+           const ctx = document.getElementById('distributionChart').getContext('2d');
+           chartInstances['distributionChart'] = new Chart(ctx, {
+               type: 'doughnut',
+               data: {
+                   labels: ['Entradas', 'Saídas'],
+                   datasets: [{ data: [totalIn, totalOut], backgroundColor: ['#198754', '#dc3545'], hoverOffset: 4 }]
+               },
+               options: { responsive: true, maintainAspectRatio: false, cutout: '70%' }
+           });
+       }
+
+       function applyFilters() {
+            const selectedMonth = monthFilter.value;
+            
+            const filteredData = allProcessedData.filter(item => {
+                const itemMonthKey = `${item.date.getFullYear()}-${(item.date.getMonth() + 1).toString().padStart(2, '0')}`;
+                return selectedMonth === 'all' || itemMonthKey === selectedMonth;
+            });
+
+            updateKPIs(filteredData);
+            renderTable(filteredData);
+            
+            const monthlyAgg = getMonthlyAggregates(allProcessedData); // Always show full trend history
+            renderEvolutionChart(monthlyAgg); 
+            
+            renderDistributionChart(filteredData); // Sensitive to filter
+       }
+
+        function generateReport() {
+            const content = document.getElementById('reportContentWrapper');
+            content.innerHTML = '';
+            
+            const agg = getMonthlyAggregates(allProcessedData);
+            let html = `<h2 class="text-center mb-4">Demonstrativo de Resultado do Exercício (Gerencial)</h2>`;
+            
+            html += `
+            <table class="table table-bordered">
+                <thead>
+                    <tr class="table-secondary">
+                        <th class="text-start">Período (Mês/Ano)</th>
+                        <th>Receita Bruta</th>
+                        <th>Despesas</th>
+                        <th>Saldo Líquido</th>
+                        <th>Margem %</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+            
+            let totalIn = 0, totalOut = 0;
+
+            agg.forEach(row => {
+                totalIn += row.income;
+                totalOut += row.expense;
+                const margin = row.income > 0 ? ((row.balance / row.income) * 100).toFixed(1) : 0;
+                const rowClass = row.balance >= 0 ? '' : 'text-danger';
+                
+                html += `
+                <tr>
+                    <td class="text-start fw-bold">${row.label}</td>
+                    <td>${formatCurrency(row.income)}</td>
+                    <td>${formatCurrency(row.expense)}</td>
+                    <td class="${rowClass}">${formatCurrency(row.balance)}</td>
+                    <td class="${rowClass}">${margin}%</td>
+                </tr>`;
+            });
+
+            // Footer Totals
+            const totalBalance = totalIn - totalOut;
+            const totalMargin = totalIn > 0 ? ((totalBalance / totalIn) * 100).toFixed(1) : 0;
+            const finalClass = totalBalance >= 0 ? 'text-success' : 'text-danger';
+
+            html += `
+                <tr class="table-light fw-bold" style="border-top: 2px solid #000;">
+                    <td class="text-start">TOTAL ACUMULADO</td>
+                    <td>${formatCurrency(totalIn)}</td>
+                    <td>${formatCurrency(totalOut)}</td>
+                    <td class="${finalClass}">${formatCurrency(totalBalance)}</td>
+                    <td class="${finalClass}">${totalMargin}%</td>
+                </tr>
+            </tbody></table>`;
+
+            html += `<div class="mt-4"><p class="small text-muted">Relatório gerado automaticamente em ${new Date().toLocaleDateString()}. Os valores representam o regime de caixa.</p></div>`;
+
+            content.innerHTML = html;
+        }
+
+       function fetchData() {
+           Papa.parse(DATA_CSV_URL, {
+               download: true,
+               header: true,
+               skipEmptyLines: true,
+               transformHeader: h => h.trim().toLowerCase(),
+               complete: function(results) {
+                   if (!results.data || results.data.length === 0) {
+                       dataDisplay.innerHTML = `<div class="alert alert-danger">CSV vazio ou formato inválido.</div>`;
+                       return;
+                   }
+
+                   // Mapear campos baseados na imagem do usuário
+                   // CSV headers esperados: período, semana, tipo, valor, descrição
+                   allProcessedData = results.data.map(row => {
+                       const date = parseDate(row['período']);
+                       const val = parseValue(row['valor']);
+                       
+                       if (!date) return null; // Pula linhas inválidas
+
+                       return {
+                           date: date,
+                           week: row['semana'] || '-',
+                           type: row['tipo'] ? row['tipo'].trim() : 'Desconhecido', // Entrada ou Saída
+                           value: val,
+                           description: row['descrição'] || 'Sem descrição'
+                       };
+                   }).filter(item => item !== null);
+
+                   populateMonthFilter(allProcessedData);
+                   applyFilters();
+               },
+               error: function(err) {
+                   console.error('Erro:', err);
+                   dataDisplay.innerHTML = `<div class="alert alert-danger">Falha ao ler o arquivo CSV. Verifique a permissão ou o link.</div>`;
+               }
+           });
+       }
+
+       monthFilter.addEventListener('change', applyFilters);
+       document.getElementById('report-button').addEventListener('click', generateReport);
+       document.getElementById('printReportButton').addEventListener('click', () => window.print());
+       
+       fetchData();
+    });
+    </script>
+</body>
+</html>
